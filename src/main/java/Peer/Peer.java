@@ -56,14 +56,21 @@ public class Peer extends SocketIO {
     @Override
     public void newPeer(JSONObject peer) {
         System.out.println(peer);
-        this.server.addPeer((Integer) peer.get("port"));//todo implement new peer right
-        //this.server.requestNewPeerEntry();
+        String host = (String) peer.get("host");
+        String id = (String) peer.get("id");
+        int port = (int) peer.get("port");
+        double metric = (double) peer.get("metric");
+        //this.server.addPeer((Integer) peer.get("port"));//todo implement new peer right
+        this.server.requestNewPeerEntry(id, host, port, metric);
     }
 
     @Override
-    public void setLeader() {
-        if (this.server.getStateType() != StateType.LEADER)
+    public void setLeader(JSONObject data) {
+        int MAX_SUPER_PEER_NETWORK_SIZE = data.getInt("superNodeSize");
+        if (this.server.getStateType() != StateType.LEADER) {
             this.server.setStateFromMarket(StateType.FOLLOWER);
+            this.server.setMAX_SUPER_PEER_NETWORK_SIZE(MAX_SUPER_PEER_NETWORK_SIZE);
+        }
         this.socket.emit(MarketEndpoints.SET_LEADER.toString());
     }
 

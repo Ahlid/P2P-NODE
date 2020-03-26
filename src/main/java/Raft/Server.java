@@ -18,6 +18,7 @@ public class Server implements ServerRMI {
     private Timer leaderTimer;
     final ArrayList<Integer> portsServers; //todo delete this
     private int serverPort;
+    private int MAX_SUPER_PEER_NETWORK_SIZE = 0;
 
     public Server(ArrayList<Integer> portsServers, int port) {
         this.state = new State();
@@ -49,7 +50,7 @@ public class Server implements ServerRMI {
     @Override
     public Pair<Long, Boolean> requestVoteRPC(long term, String candidateId, long lastLogIndex, long lastLogTerm) throws RemoteException {
 
-        System.out.println(serverPort + " received vote request" + serverPort);
+        System.out.println(serverPort + " received vote request" + candidateId + " term: " + term + " and mine is " + this.state.getCurrentTerm());
         if (term < this.state.getCurrentTerm()) {
             return new Pair<Long, Boolean>(this.state.getCurrentTerm(), false);
         }
@@ -79,6 +80,8 @@ public class Server implements ServerRMI {
             this.candidateTimer.cancel();
         }
 
+        Random ran = new Random();
+
         TimerTask onCandidateTimeout = new TimerTask() {
 
             public void sendRPCVote() {
@@ -87,7 +90,12 @@ public class Server implements ServerRMI {
                 AtomicInteger votes = new AtomicInteger(1);
                 ArrayList<Thread> threads = new ArrayList<Thread>();
 
-                for (Integer port : portsServers) {
+                for (Map.Entry<String, HashMap<String, String>> entry : superPeers.entrySet()) {
+
+                    String key = entry.getKey();
+                    HashMap<String, String> value = entry.getValue();
+                    int port = Integer.parseInt(value.get("port"));
+                    String host = value.get("host"); //todo use host
 
                     if (port == serverPort) {
                         continue;
@@ -131,7 +139,7 @@ public class Server implements ServerRMI {
                 }
 
 
-                if (state.getStateType() == StateType.CANDIDATE && votes.get() > portsServers.size() / 2) {
+                if (state.getStateType() == StateType.CANDIDATE && votes.get() > superPeers.size() / 2) {
                     state.setStateType(StateType.LEADER);
                     System.out.println(serverPort + " SERVER: " + serverPort + " leader");
                     //   startLeaderTimer();
@@ -152,7 +160,7 @@ public class Server implements ServerRMI {
                 }
 
                 System.out.println(serverPort + " Candidate Timeout");
-                state.setCurrentTerm(state.getCurrentTerm() + 1);
+                state.setCurrentTerm(state.getCurrentTerm() + ran.nextInt(2));
                 state.setStateType(StateType.CANDIDATE);
                 state.setVotedFor(Integer.toString(state.hashCode()));
                 startCandidateTimer();
@@ -163,7 +171,7 @@ public class Server implements ServerRMI {
 
         candidateTimer = new Timer();
         try {
-            candidateTimer.schedule(onCandidateTimeout, CANDIDATE_TIMEOUT + (int) Math.random() * CANDIDATE_TIMEOUT);
+            candidateTimer.schedule(onCandidateTimeout, CANDIDATE_TIMEOUT + (long) (Math.random() * (CANDIDATE_TIMEOUT)));
         } catch (Exception ignored) {
 
         }
@@ -180,11 +188,6 @@ public class Server implements ServerRMI {
 
             public void sendRPCAppend() {
 
-                if (state.getStateType() == StateType.NODE) {
-                    startLeaderTimer();
-                    return;
-                }
-
                 if (state.getStateType() != StateType.LEADER) {
                     System.out.println(serverPort + " not leader");
                     startLeaderTimer();
@@ -194,8 +197,13 @@ public class Server implements ServerRMI {
                 System.out.println(serverPort + " SENDING append RPC ");
 
 
-                state.setCurrentTerm(state.getCurrentTerm() + 1);
-                for (Integer port : portsServers) {
+                state.setCurrentTerm(state.getCurrentTerm() + 2);
+                for (Map.Entry<String, HashMap<String, String>> entry : superPeers.entrySet()) {
+
+                    String key = entry.getKey();
+                    HashMap<String, String> value = entry.getValue();
+                    int port = Integer.parseInt(value.get("port"));
+                    String host = value.get("host"); //todo use host
 
                     if (port == serverPort) {
                         continue;
@@ -206,7 +214,11 @@ public class Server implements ServerRMI {
                             Registry registry = LocateRegistry.getRegistry(port);
                             ServerRMI stub = (ServerRMI) registry.lookup("Raft.Server" + port);
                             Pair<Long, Boolean> response = stub.appendEntriesRPC(state.getCurrentTerm(), Integer.toString(state.hashCode()), state.getLastApplied(), state.getLog(), state.getCommitIndex());
-                            System.out.println(serverPort + " append rpc response: " + response.toString());
+
+                            if (!response.getValue()) {
+                                state.setStateType(StateType.FOLLOWER);
+                            }
+                            //   System.out.println(serverPort + " append rpc response: " + response.toString());
                         } catch (Exception e) {
                             System.err.println("Client exception: " + e.toString());
                             e.printStackTrace();
@@ -215,6 +227,7 @@ public class Server implements ServerRMI {
                 }
 
                 startLeaderTimer();
+                checkMembership();
             }
 
             public void run() {
@@ -232,14 +245,6 @@ public class Server implements ServerRMI {
         return this.state.getStateType();
     }
 
-    public void addPeer(int port) {
-        synchronized (this.portsServers) {
-            if (this.portsServers.size() < 3) {
-                this.portsServers.add(port);
-            }
-        }
-    }
-
     public void startServer() {
         startCandidateTimer();
         startLeaderTimer();
@@ -247,7 +252,11 @@ public class Server implements ServerRMI {
         TimerTask log = new TimerTask() {
             @Override
             public void run() {
+
                 System.out.println(state);
+                System.out.println(peers);
+                System.out.println(superPeers);
+                System.out.println(MAX_SUPER_PEER_NETWORK_SIZE);
             }
         };
 
@@ -263,6 +272,153 @@ public class Server implements ServerRMI {
         return peerInfo;
     }
 
+    public void checkMembership() {
+
+        AtomicReference<Pair<String, HashMap<String, String>>> chosenPeer = new AtomicReference<>(null);
+        AtomicReference<Double> chosenPeerMetric = new AtomicReference<>((double) 0);
+        ArrayList<Thread> threads = new ArrayList<Thread>();
+
+        new Thread(() -> {
+            synchronized (peers) {
+                if (superPeers.size() < MAX_SUPER_PEER_NETWORK_SIZE) {
+                    for (Map.Entry<String, HashMap<String, String>> entry : this.superPeers.entrySet()) {
+
+                        String key = entry.getKey();
+                        HashMap<String, String> value = entry.getValue();
+                        int raftPeerPort = Integer.parseInt(value.get("port"));
+                        String raftPeerHost = value.get("host"); //todo use host
+
+                        Thread t = new Thread(() -> {
+                            try {
+                                Registry registry = LocateRegistry.getRegistry(raftPeerPort);
+                                ServerRMI stub = (ServerRMI) registry.lookup("Raft.Server" + raftPeerPort);
+                                Pair<String, HashMap<String, String>> response = stub.getSuperPeerProposal();
+
+                                if (response == null) {
+                                    return;
+                                }
+
+                                System.out.println("PROPOSED: " + response.getKey());
+                                double metric = Double.parseDouble(response.getValue().get("metric"));
+
+                                if (metric > chosenPeerMetric.get()) {
+                                    chosenPeer.set(response);
+                                    chosenPeerMetric.set(metric);
+                                }
+
+                            } catch (Exception e) {
+                                System.err.println("Client exception: " + e.toString());
+                                e.printStackTrace();
+                            }
+                        });
+
+                        threads.add(t);
+                        t.start();
+                    }
+
+                    for (Thread thread : threads) {
+                        try {
+                            thread.join();
+                        } catch (InterruptedException ignored) {
+                        }
+                    }
+
+                    Pair<String, HashMap<String, String>> p = this.getSuperPeerProposal();
+                    if (p == null && chosenPeer.get() == null) {
+                        return;
+                    }
+
+                    if ((chosenPeer.get() == null) || (p != null && chosenPeerMetric.get() < Double.parseDouble(p.getValue().get("metric")))) {
+                        String host = (String) p.getValue().get("host");
+                        String id = (String) p.getKey();
+                        int port = Integer.parseInt(p.getValue().get("port"));
+                        double metric = Double.parseDouble(p.getValue().get("metric"));
+                        this.addSuperPeer(id, host, port, metric);
+
+                        for (Map.Entry<String, HashMap<String, String>> entry : this.superPeers.entrySet()) {
+
+                            String key = entry.getKey();
+                            HashMap<String, String> value = entry.getValue();
+                            int raftPeerPort = Integer.parseInt(value.get("port"));
+                            String raftPeerHost = value.get("host");
+
+                            new Thread(() -> {
+
+                                try {
+                                    Registry registry = LocateRegistry.getRegistry(raftPeerPort);
+                                    ServerRMI stub = (ServerRMI) registry.lookup("Raft.Server" + raftPeerPort);
+                                    HashMap<String, String> response = stub.addSuperPeer(id, host, port, metric);
+
+
+                                } catch (Exception e) {
+                                    System.err.println("Client exception: " + e.toString());
+                                    e.printStackTrace();
+                                }
+                            }).run();
+
+                        }
+
+                    } else {
+                        String host = (String) chosenPeer.get().getValue().get("host");
+                        String id = (String) chosenPeer.get().getKey();
+                        int port = Integer.parseInt(chosenPeer.get().getValue().get("port"));
+                        double metric = Double.parseDouble(chosenPeer.get().getValue().get("metric"));
+                        this.addSuperPeer(id, host, port, metric);
+
+
+                        for (Map.Entry<String, HashMap<String, String>> entry : this.superPeers.entrySet()) {
+
+                            String key = entry.getKey();
+                            HashMap<String, String> value = entry.getValue();
+                            int raftPeerPort = Integer.parseInt(value.get("port"));
+                            String raftPeerHost = value.get("host");
+
+                            new Thread(() -> {
+
+                                try {
+                                    Registry registry = LocateRegistry.getRegistry(raftPeerPort);
+                                    ServerRMI stub = (ServerRMI) registry.lookup("Raft.Server" + raftPeerPort);
+                                    HashMap<String, String> response = stub.addSuperPeer(id, host, port, metric);
+                                } catch (Exception e) {
+                                    System.err.println("Client exception: " + e.toString());
+                                    e.printStackTrace();
+                                }
+                            }).run();
+                        }
+                    }
+
+                    for (Map.Entry<String, HashMap<String, String>> entry : this.superPeers.entrySet()) {
+
+                        String key = entry.getKey();
+                        HashMap<String, String> value = entry.getValue();
+                        int raftPeerPort = Integer.parseInt(value.get("port"));
+                        String raftPeerHost = value.get("host");
+
+                        new Thread(() -> {
+
+                            try {
+                                Registry registry = LocateRegistry.getRegistry(raftPeerPort);
+                                ServerRMI stub = (ServerRMI) registry.lookup("Raft.Server" + raftPeerPort);
+                                stub.setSuperPeers(superPeers);
+
+
+                            } catch (Exception e) {
+                                System.err.println("Client exception: " + e.toString());
+                                e.printStackTrace();
+                            }
+                        }).run();
+
+                    }
+
+
+                } else {
+                    //todo: check remove
+                    System.out.println("remove check");
+                }
+            }
+        }).start();
+    }
+
     @Override
     public void requestNewPeerEntry(String id, String host, int port, double metric) {
         this.discoverNewPeerController(id, host, port, metric);
@@ -272,7 +428,7 @@ public class Server implements ServerRMI {
 
         new Thread(() -> {
             AtomicReference<String> raftChosenPeer = new AtomicReference<>(null);
-            double raftChosenMetric = 0;
+            AtomicReference<Double> raftChosenMetric = new AtomicReference<>((double) 0);
             ArrayList<Thread> threads = new ArrayList<Thread>();
 
 
@@ -289,8 +445,9 @@ public class Server implements ServerRMI {
                         ServerRMI stub = (ServerRMI) registry.lookup("Raft.Server" + raftPeerPort);
                         double response = stub.getNewPeerMetric(id, host, port);
                         System.out.println(serverPort + " discover: " + response);
-                        if (response > raftChosenMetric) {
+                        if (response > raftChosenMetric.get()) {
                             raftChosenPeer.set(key);
+                            raftChosenMetric.set(response);
                         }
 
                     } catch (Exception e) {
@@ -312,16 +469,18 @@ public class Server implements ServerRMI {
 
 
             double thisNodeMetric = this.getNewPeerMetric(id, host, port);
-            if (thisNodeMetric > raftChosenMetric) {
+            if (thisNodeMetric > raftChosenMetric.get() || raftChosenPeer.get() == null) {
+                System.out.println("NEW PEER ADDED TO ME");
                 this.addNewPeer(id, host, port, metric);
             } else {
                 try {
-                    HashMap<String, String> value = this.superPeers.get(raftChosenPeer);
+                    HashMap<String, String> value = this.superPeers.get(raftChosenPeer.get());
                     int raftPeerPort = Integer.parseInt(value.get("port"));
                     String raftPeerHost = value.get("host"); //todo use host
                     Registry registry = LocateRegistry.getRegistry(raftPeerPort);
                     ServerRMI stub = (ServerRMI) registry.lookup("Raft.Server" + raftPeerPort);
-                    double response = stub.getNewPeerMetric(id, host, port);
+                    HashMap<String, String> response = stub.addNewPeer(id, host, port, metric);
+                    System.out.println("NEW PEER ADDED TO OTHER NODE");
                 } catch (Exception e) {
                     System.err.println("Client exception: " + e.toString());
                     e.printStackTrace();
@@ -368,6 +527,18 @@ public class Server implements ServerRMI {
     }
 
     @Override
+    public void setSuperPeers(HashMap<String, HashMap<String, String>> superPeers) throws RemoteException {
+        synchronized (this.superPeers) {
+            this.superPeers.clear();
+            this.superPeers.putAll(superPeers);
+        }
+    }
+
+    public void setMAX_SUPER_PEER_NETWORK_SIZE(int MAX_SUPER_PEER_NETWORK_SIZE) {
+        this.MAX_SUPER_PEER_NETWORK_SIZE = MAX_SUPER_PEER_NETWORK_SIZE;
+    }
+
+    @Override
     public Pair<String, HashMap<String, String>> getSuperPeerProposal() {
 
         Pair<String, HashMap<String, String>> chosenPeer = null;
@@ -377,7 +548,7 @@ public class Server implements ServerRMI {
             String key = entry.getKey();
             HashMap<String, String> value = entry.getValue();
 
-            if (this.blockedPeers.contains(key)) {
+            if (this.blockedPeers.contains(key) || this.superPeers.containsKey(key)) {
                 continue;
             }
 

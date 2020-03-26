@@ -3,7 +3,7 @@ package Peer;
 import org.json.JSONObject;
 
 public interface IMarket {
-    void setLeader();
+    void setLeader(JSONObject data);
 
     void peerConnection();
 

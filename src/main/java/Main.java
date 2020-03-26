@@ -45,7 +45,7 @@ public class Main {
                     obj.startServer();
                     online = true;
                 } catch (ExportException e) {
-                    System.out.println("export");
+                    //  e.printStackTrace();
                 }
             }
 
