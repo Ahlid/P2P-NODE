@@ -3,16 +3,15 @@ package Peer.Events;
 import Peer.SocketIO;
 import org.json.JSONObject;
 
-public class OnSetAsLeader extends Event {
+public class OnSessionToken extends Event {
 
-    public OnSetAsLeader(SocketIO socketIO) {
+    public OnSessionToken(SocketIO socketIO) {
         super(socketIO);
     }
 
     @Override
     public void call(Object... args) {
         JSONObject obj = (JSONObject) args[0];
-        System.out.println("new leader");
-        this.socketIO.setLeader(obj);
+        this.socketIO.setToken(obj);
     }
 }

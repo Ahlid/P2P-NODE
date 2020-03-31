@@ -1,11 +1,9 @@
-package Raft;
-
-import javafx.util.Pair;
+package Raft.Interfaces;
 
 import java.rmi.Remote;
 import java.rmi.RemoteException;
-import java.util.ArrayList;
-import java.util.HashMap;
+import Raft.State.State;
+import Raft.State.StateType;
 
 public interface ServerRMI extends Remote, Raft, ServerMembership {
     State state = null;

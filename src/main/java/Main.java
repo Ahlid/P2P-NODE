@@ -1,11 +1,6 @@
 import Peer.Peer;
 import Raft.Server;
-import Raft.ServerRMI;
-import Raft.StateType;
-import io.socket.client.IO;
-import io.socket.client.Socket;
-import io.socket.emitter.Emitter;
-import org.json.JSONObject;
+import Raft.Interfaces.ServerRMI;
 
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
@@ -27,10 +22,7 @@ public class Main {
                 try {
                     port++;
 
-                    ArrayList<Integer> hosts = new ArrayList<>();
-                    hosts.add(port);
-
-                    obj = new Server(hosts, port);
+                    obj = new Server(port);
                     ServerRMI stub = (ServerRMI) UnicastRemoteObject.exportObject(obj, port);
 
 
@@ -51,7 +43,7 @@ public class Main {
 
             System.err.println("Raft.Server ready");
 
-            Peer peer = new Peer("http://localhost:8082", "localhost", port, obj);
+            Peer peer = new Peer("http://localhost:8082", "localhost", port, obj, "username", "password");
             peer.start();
 
 

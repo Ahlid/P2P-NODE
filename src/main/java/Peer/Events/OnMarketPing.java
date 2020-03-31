@@ -1,7 +1,6 @@
 package Peer.Events;
 
 import Peer.SocketIO;
-import Raft.StateType;
 
 public class OnMarketPing extends Event {
 

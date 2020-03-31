@@ -16,4 +16,8 @@ public interface IMarket {
     void setNodeState();
 
     void newPeer(JSONObject peer);
+
+    void setToken(JSONObject peer);
+
+    void requestJobAssign(JSONObject peer);
 }

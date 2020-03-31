@@ -1,7 +1,9 @@
-package Peer;
+package Peer.CommunicationInterfaces;
+
+import Peer.Peer;
 
 public enum MarketEndpoints {
-    SET_LEADER, PEER_CONNECTION, LEADER_HZ, PONG;
+    SET_LEADER, PEER_CONNECTION, LEADER_HZ, PONG, JOB_ASSIGNED;
 
 
     @Override
@@ -15,6 +17,8 @@ public enum MarketEndpoints {
                 return "PEER_CONNECTION";
             case PONG:
                 return "P2P_PONG";
+            case JOB_ASSIGNED:
+                return "JOB_ASSIGNED";
             default:
                 return "";
         }

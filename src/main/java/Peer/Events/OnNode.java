@@ -8,6 +8,10 @@ public class OnNode extends Event {
         super(socketIO);
     }
 
+    /**
+     * Calls the setNodeState of the peer to make it change to Node state
+     * @param args socket io args
+     */
     @Override
     public void call(Object... args) {
         System.out.println("Socket Connected");

@@ -1,7 +1,9 @@
-package Peer;
+package Peer.CommunicationInterfaces;
+
+import Peer.Peer;
 
 public enum PeerEndpoints {
-    HELLO, SET_LEADER, MARKET_PING, PING, SET_NODE, NEW_PEER;
+    HELLO, SET_LEADER, MARKET_PING, PING, SET_NODE, NEW_PEER, REQUEST_JOB_ASSIGN, SEND_SESSION_TOKEN;
 
     @Override
     public String toString() {
@@ -18,6 +20,10 @@ public enum PeerEndpoints {
                 return "SET_NODE";
             case NEW_PEER:
                 return "NEW_PEER";
+            case REQUEST_JOB_ASSIGN:
+                return "REQUEST_JOB_ASSIGN";
+            case SEND_SESSION_TOKEN:
+                return "SEND_SESSION_TOKEN";
             default:
                 return "";
         }
