@@ -3,7 +3,7 @@ package Peer.CommunicationInterfaces;
 import Peer.Peer;
 
 public enum MarketEndpoints {
-    SET_LEADER, PEER_CONNECTION, LEADER_HZ, PONG, JOB_ASSIGNED;
+    SET_LEADER, PEER_CONNECTION, LEADER_HZ, PONG, JOB_ASSIGNED, SEND_PEERS_STATE;
 
 
     @Override
@@ -19,6 +19,8 @@ public enum MarketEndpoints {
                 return "P2P_PONG";
             case JOB_ASSIGNED:
                 return "JOB_ASSIGNED";
+            case SEND_PEERS_STATE:
+                return "SEND_PEERS_STATE";
             default:
                 return "";
         }

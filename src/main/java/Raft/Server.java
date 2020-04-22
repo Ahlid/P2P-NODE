@@ -1,11 +1,13 @@
 package Raft;
 
+import Peer.Peer;
 import Raft.Interfaces.ServerRMI;
 import Raft.State.State;
 import Raft.State.StateType;
 import javafx.util.Pair;
 
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
@@ -97,6 +99,11 @@ public class Server implements ServerRMI {
     private final long LEADER_TIMEOUT = 200;
 
     /**
+     * Leader timeout to send append entries RPC
+     */
+    private final long PEER_TIMEOUT = 5000;
+
+    /**
      * Candidate timer to control new election
      */
     private Timer candidateTimer;
@@ -105,6 +112,11 @@ public class Server implements ServerRMI {
      * Leader timer to control send append RPC
      */
     private Timer leaderTimer;
+
+    /**
+     * Leader timer to control send append RPC
+     */
+    private Timer peerTimer;
 
     /**
      * Port where we are running
@@ -122,6 +134,11 @@ public class Server implements ServerRMI {
      */
     int MAX_SUPER_PEER_NETWORK_SIZE = 0;
 
+    /**
+     * Current Peer
+     */
+    private Peer peer;
+
 
     /**
      * Creates new instance of the server
@@ -135,7 +152,7 @@ public class Server implements ServerRMI {
 
         // create logger to file
         this.logger = Logger.getLogger("server-" + port);
-        FileHandler fh = new FileHandler("./logs/" + port + ".log");
+        FileHandler fh = new FileHandler("logs/" + port + ".log");
         logger.addHandler(fh);
         SimpleFormatter formatter = new SimpleFormatter();
         fh.setFormatter(formatter);
@@ -494,6 +511,64 @@ public class Server implements ServerRMI {
         return chosenPeer;
     }
 
+    public List<HashMap<String, String>> sendNodeCheck() {
+
+
+        List<HashMap<String, String>> configs = new ArrayList<HashMap<String, String>>();
+        List<Thread> threads = new ArrayList<>();
+
+        for (Map.Entry<String, HashMap<String, String>> entry : this.peers.entrySet()) {
+
+
+            String key = entry.getKey();
+            HashMap<String, String> value = entry.getValue();
+            int raftPeerPort = Integer.parseInt(value.get("port"));
+            String raftPeerHost = value.get("host"); //todo use host
+
+            Thread t = new Thread(() -> {
+                try {
+                    Registry registry = LocateRegistry.getRegistry(raftPeerPort);
+                    ServerRMI stub = (ServerRMI) registry.lookup("Raft.Server" + raftPeerPort);
+                    configs.add(stub.requestNodeCheck());
+                } catch (Exception e) {
+                    System.err.println("Client exception: " + e.toString());
+                    e.printStackTrace();
+                }
+            });
+
+            threads.add(t);
+            t.start();
+
+        }
+
+        for (Thread thread : threads) {
+            try {
+                thread.join();
+            } catch (InterruptedException ignored) {
+            }
+        }
+
+        return configs;
+    }
+
+    @Override
+    public HashMap<String, String> requestNodeCheck() throws RemoteException {
+
+        startPeerTimer();
+
+        Random r = new Random();
+        HashMap<String, String> config = new HashMap();
+
+        config.put("host", "localhost");
+        config.put("port", this.serverPort + "");
+        config.put("credits", r.nextInt(50) + "");
+        config.put("cpu", r.nextInt(1000000000) + "");
+        config.put("ram", r.nextInt(26400000) + "");
+        config.put("disk", r.nextInt(26400000) + "");
+
+        return config;
+    }
+
     /**
      * Returns the current state type
      *
@@ -645,12 +720,55 @@ public class Server implements ServerRMI {
 
     }
 
+    public void startPeerTimer() {
+
+        if (this.peerTimer != null) {
+            this.peerTimer.cancel();
+        }
+
+        TimerTask onPeerTimeout = new TimerTask() {
+
+            public void run() {
+                try {
+                    if (state.getStateType() == StateType.NODE) {
+                        restart();
+                    }
+                    startPeerTimer();
+                } catch (URISyntaxException e) {
+                    e.printStackTrace();
+                    startPeerTimer();
+                }
+            }
+        };
+
+
+        peerTimer = new Timer();
+        peerTimer.schedule(onPeerTimeout, PEER_TIMEOUT, PEER_TIMEOUT);
+
+    }
+
+    public void setPeer(Peer peer) {
+        this.peer = peer;
+    }
+
+
+    public void restart() throws URISyntaxException {
+        this.state = new State();
+        this.peers.clear();
+        this.superPeers.clear();
+        this.blockedPeers.clear();
+        this.peerFailedCheck.clear();
+        this.peer.start();
+        this.startServer();
+    }
+
     /**
      * Starts the server
      */
     public void startServer() {
         startCandidateTimer();
         startLeaderTimer();
+        startPeerTimer();
 
         TimerTask log = new TimerTask() {
             @Override

@@ -4,13 +4,18 @@ import Peer.CommunicationInterfaces.MarketEndpoints;
 import Raft.Server;
 import Raft.State.StateType;
 import io.socket.client.IO;
+import org.json.JSONArray;
 import org.json.JSONObject;
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.net.URISyntaxException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class Peer extends SocketIO {
 
+    private static final long PEER_TIMEOUT = 1000;
     /**
      * peer password
      */
@@ -25,6 +30,7 @@ public class Peer extends SocketIO {
      * Market uri to communicate using socket io
      */
     private String uri;
+    private Timer peerTimer;
 
 
     /**
@@ -44,6 +50,9 @@ public class Peer extends SocketIO {
         this.server = server;
         this.username = username;
         this.password = password;
+
+
+        this.server.setPeer(this);
     }
 
     /**
@@ -78,6 +87,7 @@ public class Peer extends SocketIO {
         this.socket = IO.socket(this.uri); //bind socket
         this.bindInterface();
         this.socket.connect();
+        startPeerTimer();
     }
 
     /**
@@ -122,24 +132,18 @@ public class Peer extends SocketIO {
 
     /**
      * When market authenticates us and send us the auth token
+     *
      * @param peer
      */
     @Override
     public void setToken(JSONObject peer) {
-        throw new NotImplementedException();
+
     }
 
-    /**
-     * When market requests to the network to find the best volunteer for the job
-     * @param peer
-     */
-    @Override
-    public void requestJobAssign(JSONObject peer) {
-        throw new NotImplementedException();
-    }
 
     /**
      * When market elects leader
+     *
      * @param data - ?
      */
     @Override
@@ -172,4 +176,31 @@ public class Peer extends SocketIO {
     public void leaderHZ() {
         socket.emit(MarketEndpoints.LEADER_HZ.toString());
     }
+
+
+    public void startPeerTimer() {
+
+        if (this.peerTimer != null) {
+            this.peerTimer.cancel();
+        }
+
+        TimerTask onPeerTimeout = new TimerTask() {
+
+            public void run() {
+                List<HashMap<String, String>> configs = server.sendNodeCheck();
+                if (configs.size() > 0) {
+                    JSONArray response = new JSONArray(configs);
+                    socket.emit(MarketEndpoints.SEND_PEERS_STATE.toString(), response);
+                }
+
+                startPeerTimer();
+            }
+        };
+
+
+        peerTimer = new Timer();
+        peerTimer.schedule(onPeerTimeout, PEER_TIMEOUT);
+
+    }
+
 }

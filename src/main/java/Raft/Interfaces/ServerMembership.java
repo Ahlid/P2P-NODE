@@ -7,6 +7,7 @@ import java.rmi.RemoteException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 
 public interface ServerMembership extends Remote {
 
@@ -143,5 +144,7 @@ public interface ServerMembership extends Remote {
      * @throws RemoteException RMI
      */
     Pair<String, HashMap<String, String>> getSuperPeerProposal() throws RemoteException;
+
+    HashMap<String, String> requestNodeCheck() throws RemoteException;
 
 }

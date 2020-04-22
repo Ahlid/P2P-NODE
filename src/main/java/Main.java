@@ -37,7 +37,7 @@ public class Main {
                     obj.startServer();
                     online = true;
                 } catch (ExportException e) {
-                    //  e.printStackTrace();
+                      e.printStackTrace();
                 }
             }
 

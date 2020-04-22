@@ -4,7 +4,6 @@ import Peer.CommunicationInterfaces.PeerEndpoints;
 import Peer.Events.*;
 import Raft.Server;
 import io.socket.client.Socket;
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 /**
  * Abstract Class to make binding os socket.io and market events
@@ -102,13 +101,6 @@ public abstract class SocketIO implements IMarket {
         this.socket.on(PeerEndpoints.SEND_SESSION_TOKEN.toString(), new OnSessionToken(this));
     }
 
-    /**
-     * Bind receive of the session token
-     */
-    void onNewJobAssignRequest() {
-        throw new NotImplementedException();
-        //this.socket.on(PeerEndpoints.SEND_SESSION_TOKEN.toString(), new OnNewJobAssignRequest(this));
-    }
 
     /* gets */
 
