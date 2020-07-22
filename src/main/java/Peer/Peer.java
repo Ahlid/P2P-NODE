@@ -26,6 +26,9 @@ public class Peer extends SocketIO {
      */
     private String username;
 
+    private String machineId;
+    private String machineToken = null;
+    private String token = null;
     /**
      * Market uri to communicate using socket io
      */
@@ -43,14 +46,14 @@ public class Peer extends SocketIO {
      * @param username - peer username
      * @param password - peer password
      */
-    public Peer(String uri, String host, int port, Server server, String username, String password) {
+    public Peer(String uri, String host, int port, Server server, String username, String password, String machineId) {
         this.uri = uri;
         this.host = host;
         this.port = port;
         this.server = server;
         this.username = username;
         this.password = password;
-
+        this.machineId = machineId;
 
         this.server.setPeer(this);
     }
@@ -133,11 +136,12 @@ public class Peer extends SocketIO {
     /**
      * When market authenticates us and send us the auth token
      *
-     * @param peer
+     * @param data
      */
     @Override
-    public void setToken(JSONObject peer) {
-
+    public void setToken(JSONObject data) {
+        this.token = data.getString("token");
+        this.machineToken = data.getString("machineToken");
     }
 
 
@@ -166,6 +170,10 @@ public class Peer extends SocketIO {
         obj2.put("host", this.host);
         obj2.put("username", this.username);
         obj2.put("password", this.password);
+        obj2.put("machineId", this.machineId);
+        obj2.put("token", this.token);
+        obj2.put("machineToken", this.machineToken);
+        obj2.put("mess", "mess");
         this.socket.emit(MarketEndpoints.PEER_CONNECTION.toString(), obj2);
     }
 
@@ -176,7 +184,6 @@ public class Peer extends SocketIO {
     public void leaderHZ() {
         socket.emit(MarketEndpoints.LEADER_HZ.toString());
     }
-
 
     public void startPeerTimer() {
 
@@ -189,7 +196,10 @@ public class Peer extends SocketIO {
             public void run() {
                 List<HashMap<String, String>> configs = server.sendNodeCheck();
                 if (configs.size() > 0) {
-                    JSONArray response = new JSONArray(configs);
+                    JSONObject response = new JSONObject();
+                    JSONArray configsResponse = new JSONArray(configs);
+                    response.put("id", machineId);
+                    response.put("peersData", configsResponse);
                     socket.emit(MarketEndpoints.SEND_PEERS_STATE.toString(), response);
                 }
 
@@ -203,4 +213,7 @@ public class Peer extends SocketIO {
 
     }
 
+    public String getMachineId() {
+        return machineId;
+    }
 }

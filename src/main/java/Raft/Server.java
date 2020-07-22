@@ -517,6 +517,12 @@ public class Server implements ServerRMI {
         List<HashMap<String, String>> configs = new ArrayList<HashMap<String, String>>();
         List<Thread> threads = new ArrayList<>();
 
+        //add self config
+        try {
+            configs.add(this.requestNodeCheck());
+        } catch (Exception ignored) {
+        }
+
         for (Map.Entry<String, HashMap<String, String>> entry : this.peers.entrySet()) {
 
 
@@ -560,6 +566,7 @@ public class Server implements ServerRMI {
         HashMap<String, String> config = new HashMap();
 
         config.put("host", "localhost");
+        config.put("id", this.peer.getMachineId());
         config.put("port", this.serverPort + "");
         config.put("credits", r.nextInt(50) + "");
         config.put("cpu", r.nextInt(1000000000) + "");
@@ -984,6 +991,7 @@ public class Server implements ServerRMI {
      */
     private HashMap<String, String> mountPeerInfo(String id, String host, int port, double metric) {
         HashMap<String, String> peerInfo = new HashMap<String, String>();
+        peerInfo.put("id", id);
         peerInfo.put("host", host);
         peerInfo.put("port", String.valueOf(port));
         peerInfo.put("metric", String.valueOf(metric));
