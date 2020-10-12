@@ -15,7 +15,6 @@ import java.rmi.registry.Registry;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.FileHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
@@ -139,6 +138,11 @@ public class Server implements ServerRMI {
      */
     private Peer peer;
 
+    /**
+     * Timer for print log
+     */
+    private Timer logTimer;
+
 
     /**
      * Creates new instance of the server
@@ -152,10 +156,10 @@ public class Server implements ServerRMI {
 
         // create logger to file
         this.logger = Logger.getLogger("server-" + port);
-        FileHandler fh = new FileHandler("logs/" + port + ".log");
-        logger.addHandler(fh);
+        //FileHandler fh = new FileHandler("C:/Users/tiago/IdeaProjects/P2P-Node/logs/" + port + ".log");
+        //logger.addHandler(fh);
         SimpleFormatter formatter = new SimpleFormatter();
-        fh.setFormatter(formatter);
+        //fh.setFormatter(formatter);
         logger.setUseParentHandlers(false);
     }
 
@@ -759,12 +763,20 @@ public class Server implements ServerRMI {
     }
 
 
-    public void restart() throws URISyntaxException {
+    public void stop() throws URISyntaxException {
         this.state = new State();
         this.peers.clear();
         this.superPeers.clear();
         this.blockedPeers.clear();
         this.peerFailedCheck.clear();
+        this.logTimer.cancel();
+        this.peerTimer.cancel();
+        this.candidateTimer.cancel();
+        this.leaderTimer.cancel();
+    }
+
+    public void restart() throws URISyntaxException {
+        stop();
         this.peer.start();
         this.startServer();
     }
@@ -792,8 +804,8 @@ public class Server implements ServerRMI {
             }
         };
 
-        Timer t = new Timer();
-        t.schedule(log, 0, 5000);
+        this.logTimer = new Timer();
+        this.logTimer.schedule(log, 0, 5000);
     }
 
     /**

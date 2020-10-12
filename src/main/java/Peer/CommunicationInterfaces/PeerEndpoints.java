@@ -1,7 +1,5 @@
 package Peer.CommunicationInterfaces;
 
-import Peer.Peer;
-
 public enum PeerEndpoints {
     HELLO, SET_LEADER, MARKET_PING, PING, SET_NODE, NEW_PEER, REQUEST_JOB_ASSIGN, SEND_SESSION_TOKEN;
 

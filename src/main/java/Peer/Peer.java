@@ -15,6 +15,14 @@ import java.util.TimerTask;
 
 public class Peer extends SocketIO {
 
+
+    private boolean stopped = false;
+
+    public static void main(String[] args) {
+        System.out.println("POG");
+    }
+
+
     private static final long PEER_TIMEOUT = 1000;
     /**
      * peer password
@@ -47,6 +55,7 @@ public class Peer extends SocketIO {
      * @param password - peer password
      */
     public Peer(String uri, String host, int port, Server server, String username, String password, String machineId) {
+
         this.uri = uri;
         this.host = host;
         this.port = port;
@@ -54,6 +63,21 @@ public class Peer extends SocketIO {
         this.username = username;
         this.password = password;
         this.machineId = machineId;
+
+
+        this.server.setPeer(this);
+    }
+
+    public Peer(String uri , Server server, String host, int port,  String token, String machineToken, String machineId) {
+
+        this.uri = uri;
+        this.host = host;
+        this.port = port;
+        this.server = server;
+        this.token = token;
+        this.machineToken = machineToken;
+        this.machineId = machineId;
+
 
         this.server.setPeer(this);
     }
@@ -87,6 +111,7 @@ public class Peer extends SocketIO {
      * @throws URISyntaxException
      */
     public void start() throws URISyntaxException {
+        System.err.println(this.uri);
         this.socket = IO.socket(this.uri); //bind socket
         this.bindInterface();
         this.socket.connect();
@@ -191,6 +216,10 @@ public class Peer extends SocketIO {
             this.peerTimer.cancel();
         }
 
+        if (this.stopped) {
+            return;
+        }
+
         TimerTask onPeerTimeout = new TimerTask() {
 
             public void run() {
@@ -215,5 +244,15 @@ public class Peer extends SocketIO {
 
     public String getMachineId() {
         return machineId;
+    }
+
+    public void stop() throws URISyntaxException {
+        this.socket.disconnect();
+        this.socket.close();
+        this.server.stop();
+        this.server.setPeer(null);
+        this.peerTimer.cancel();
+        this.server = null;
+        this.stopped = true;
     }
 }

@@ -1,7 +1,8 @@
 import Peer.Peer;
-import Raft.Server;
 import Raft.Interfaces.ServerRMI;
+import Raft.Server;
 
+import java.net.URISyntaxException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.ExportException;
@@ -10,13 +11,18 @@ import java.util.ArrayList;
 
 public class Main {
 
+    static Server obj = null;
+    static Peer peer;
+
     public static void main(String[] args) {
         try {
 
-            int port = 8200;
             int machine = 0;
             boolean online = false;
-            Server obj = null;
+            String token = null;
+            String machineToken = null;
+            int port = 8200;
+
             ArrayList<String> machines = new ArrayList();
             machines.add("45692db4-c1ef-4be1-b151-f68810907a7b");
             machines.add("4781a80c-b298-4317-b299-e113362f9b67");
@@ -30,10 +36,25 @@ public class Main {
             machines.add("0c3e4b0a-f6e5-4434-a701-5bca6e7fd342");
             machines.add("63f53e57-8c58-4d36-bc50-b41d145de0cc");
 
+            String machineId = machines.get(0);
+
+
+            System.out.println(args.length);
+            if (args.length == 4) {
+                System.out.println(args[0]);
+                System.out.println(args[1]);
+                System.out.println(args[2]);
+                System.out.println(args[3]);
+                token = args[0];
+                port = Integer.parseInt(args[1]);
+                machineId = args[2];
+                machineToken = args[3];
+            }
+
+
             while (!online) {
 
                 try {
-                    port++;
 
                     obj = new Server(port);
                     ServerRMI stub = (ServerRMI) UnicastRemoteObject.exportObject(obj, port);
@@ -47,23 +68,41 @@ public class Main {
 
                     Thread.sleep(1000);
 
-                    obj.startServer();
+
                     online = true;
                 } catch (ExportException e) {
-                    // e.printStackTrace();
+                    e.printStackTrace();
                     machine++;
                 }
             }
 
-            System.err.println("Raft.Server ready");
 
-            Peer peer = new Peer("http://localhost:8082", "localhost", port, obj, "tese@ist.com", "tese@ist.com", machines.get(machine));
+            if(token != null) {
+                peer = new Peer("http://192.168.1.72:8082", obj, "localhost", port, token, machineToken, machineId);
+            }else{
+                peer = new Peer("http://192.168.1.72:8082", "localhost", port, obj, "tese@ist.com", "tese@ist.com", machineId);
+            }
+
+
+            System.err.println("Raft.Server ready" + port);
             peer.start();
+
+            obj.startServer();
 
 
         } catch (Exception e) {
             System.err.println("Raft.Server exception: " + e.toString());
             e.printStackTrace();
         }
+
+        System.err.println("==================================================");
+    }
+
+
+    public static void stop() throws URISyntaxException {
+        peer.stop();
+        obj = null;
+        peer = null;
+        System.gc();
     }
 }

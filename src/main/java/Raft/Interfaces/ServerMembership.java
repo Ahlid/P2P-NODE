@@ -4,10 +4,8 @@ import javafx.util.Pair;
 
 import java.rmi.Remote;
 import java.rmi.RemoteException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 
 public interface ServerMembership extends Remote {
 

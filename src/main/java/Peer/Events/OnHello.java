@@ -1,7 +1,6 @@
 package Peer.Events;
 
 import Peer.SocketIO;
-import org.json.JSONObject;
 
 public class OnHello extends Event {
 

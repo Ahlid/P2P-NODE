@@ -1,7 +1,5 @@
 package Peer.CommunicationInterfaces;
 
-import Peer.Peer;
-
 public enum MarketEndpoints {
     SET_LEADER, PEER_CONNECTION, LEADER_HZ, PONG, JOB_ASSIGNED, SEND_PEERS_STATE;
 
